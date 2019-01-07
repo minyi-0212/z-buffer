@@ -43,6 +43,8 @@ private:
 	void draw_line(const int& y);
 	void draw_region(const int& x1, const int& x2, const int& y, const glm::vec3& color);
 	int count_active_poly_flag();
+	void update(const int& y);
+
 public:
 	void set_size(const int& w, const int& h);
 	void init(const std::vector<std::vector<glm::vec3>>& faces);

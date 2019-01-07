@@ -6,7 +6,7 @@
 using namespace std;
 using glm::vec3;
 
-const GLint image_width = 500, image_height = 500;
+const GLint image_width = 600, image_height = 600;
 Object test;
 Z_Buffer buf;
 vector<float> pixel_data;
@@ -14,7 +14,7 @@ vector<float> pixel_data;
 void init()
 {
 	// init obj
-	test.read_obj("test.obj");
+	test.read_obj("test7.obj");
 	vector<vec3> vec;
 	vector<vector<vec3>> face;
 	test.get_vertices(vec);
