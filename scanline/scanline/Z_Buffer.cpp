@@ -222,7 +222,7 @@ void Z_Buffer::draw_line(const int& y)
 					<< " (" << color.x << "," << color.y << "," << color.z << ")" << endl;*/
 				//cout << y << " " << e1->x << " " << e1->dx << "," << e2->x << " " << e2->dx << endl;
 			}
-			else if (in_out_flag_size != 0 && (round(e1->x) != round(e2->x)))
+			else if (in_out_flag_size != 0 /*&& (round(e1->x) != round(e2->x))*/)
 			{
 				int judge_x = (e1->x + e2->x) / 2;
 				float max_z = INT_MIN;
