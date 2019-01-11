@@ -1,22 +1,22 @@
 #include <glut.h>
+#include <iostream>
 #include "Z_Buffer.h"
 #include "Obj_Loader.h"
 
-#include <iostream>
 using namespace std;
 using glm::vec3;
 
-const GLint image_width = 600, image_height = 600;
+const GLint image_width = 600, image_height = 600, drawMode = 0;
 Object test;
 Z_Buffer buf;
 vector<float> pixel_data;
+vector<vec3> vec;
+vector<vector<vec3>> face;
 
 void init()
 {
 	// init obj
 	test.read_obj("test7.obj");
-	vector<vec3> vec;
-	vector<vector<vec3>> face;
 	test.get_vertices(vec);
 	test.get_faces(face);
 
@@ -61,6 +61,31 @@ void init()
 	buf.get_buffer(pixel_data);
 }
 
+void get_FPS()
+{
+	static int frame = 0, time, timebase = 0;
+	static char buffer[256];
+
+	char mode[64];
+	if (drawMode == 0)
+		strcpy_s(mode, "naive");
+	else if (drawMode == 1)
+		strcpy_s(mode, "vertex array");
+	else
+		strcpy_s(mode, "display list");
+
+	frame++;
+	time = glutGet(GLUT_ELAPSED_TIME);
+	if (time - timebase > 1000) {
+		sprintf_s(buffer, "FPS:%4.2f %s",
+			frame*1000.0 / (time - timebase), mode);
+		timebase = time;
+		frame = 0;
+	}
+
+	glutSetWindowTitle(buffer);
+}
+
 void redraw()
 {
 	// TODO£∫ GL_FLOATµƒŒ Ã‚
@@ -81,17 +106,20 @@ void redraw()
 	glDrawPixels(image_width, image_height,
 			GL_BGR_EXT, GL_FLOAT, pixel_data.data());
 
-	/*glClear(GL_COLOR_BUFFER_BIT);
-	glBegin(GL_TRIANGLES);
-	for (int i = 0; i < 3; i++)
-	{
-		glm::vec3 tmp = vec[face[0][3][i] - 1];
-		cout << face[0][3][i] <<" "<< tmp.x <<" " << tmp.z << " " << tmp.y << endl;
-		glVertex3f(tmp.x,  tmp.z, tmp.y);
-		glColor3f(0.0, 0.0, 1.0);
-	}
-	glEnd();*/
+//	glClear(GL_COLOR_BUFFER_BIT);
+//	glBegin(GL_TRIANGLES);
+////#pragma omp parallel for
+//	for (int i = 0; i < 3; i++)
+//	{
+//		glm::vec3 tmp = vec3(i / 4.0, i / 4.0, i / 4.0)/*face[3][i]*/;
+//		cout << i <<" "<< tmp.x <<" " << tmp.z << " " << tmp.y << endl;
+//		//glVertex3f(tmp.x, tmp.z, tmp.y);
+//		glColor3f(1.0, 1.0, 0.0);
+//		glVertex2f(tmp.x,  tmp.y);
+//	}
+//	glEnd();
 
+	get_FPS();
 	glutSwapBuffers();
 }
 
@@ -108,6 +136,11 @@ void reshape(int w, int h)
 	glLoadIdentity();
 }
 
+void idle()
+{
+	glutPostRedisplay();
+}
+
 int main(int argc, char *argv[])
 {
 	init();
@@ -116,8 +149,9 @@ int main(int argc, char *argv[])
 	glutInitWindowSize(image_width, image_height);
 	int windowHandle = glutCreateWindow("Gmy Scanline Z-buffer");
 
+	glutDisplayFunc(redraw);
 	//glutReshapeFunc(reshape);
-	glutDisplayFunc(&redraw);
+	glutIdleFunc(idle);
 	glutMainLoop();
 
 	return 0;

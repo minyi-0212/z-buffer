@@ -1,6 +1,7 @@
 #include <iostream>
 #include <algorithm>
 #include "Z_Buffer.h"
+#include "gtc/matrix_transform.hpp"
 
 using namespace glm;
 using namespace std;
@@ -23,8 +24,39 @@ void comput_plane_coefficient(const vector<vec3>& point,
 	d = -dot(v, point[1]);
 }
 
-void Z_Buffer::init(const vector<vector<vec3>>& faces)
+void Z_Buffer::model_to_clip(vector<vector<vec3>>& faces)
 {
+	mat4 model = glm::mat4(1.0f);
+	//model = translate(model, glm::vec3(0.0f, 100.0f, 0.0f));
+	//model = rotate(model, 45.f, glm::vec3(0.0f, 1.0f, 0.0f));
+	//model = scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
+	mat4 view = glm::lookAt(vec3(0, 0, 100), vec3(0, 0, 0), vec3(0, 1, 0));
+	float x1 = -0.0f, x2 = 600.0f,
+		y1 = -0.0f, y2 = 600.0f;
+	_width = x2 - x1;
+	_height = y2 - y1;
+	mat4 projection = glm::ortho(x1, x2, y1, y2, -50.0f, 300.f);
+	mat4 mvp = projection*view*model;
+	
+	// model world view clip
+	for (auto &f : faces)
+	{
+		for (auto& e : f)
+		{
+			vec4 tmp(e, 1);
+			tmp = mvp*tmp;
+			e = tmp;
+			e.x = (tmp.x + 1.0)*_width / 2;
+			e.y = (tmp.y + 1.0)*_height / 2;
+			e.z = -tmp.z * __min(_width, _height);
+			//cout << e.x << " " << e.y << " " << e.z << endl;
+		}
+	}
+}
+
+void Z_Buffer::init(vector<vector<vec3>>& faces)
+{
+	model_to_clip(faces);
 	/*_frame_buffer.resize(_width*_height * 3);
 	for (int i = 0; i < _width*_height; i++)
 	{
@@ -182,8 +214,8 @@ int Z_Buffer::count_active_poly_flag()
 
 void Z_Buffer::draw_region(const int& x1, const int& x2, const int& y, const glm::vec3& color)
 {
-	int offset = y*_width*3;
-	for (int i = x1; i <= x2; i++)
+	int offset = y*_width * 3;
+	for (int i = __max(x1, 0); i <= x2; i++)
 	{
 		_frame_buffer[offset + i * 3] = color.x;
 		_frame_buffer[offset + i * 3 + 1] = color.y;
@@ -204,7 +236,7 @@ void Z_Buffer::draw_line(const int& y)
 	//cout << endl << y << endl;
 	if (_active_edge.size() > 0)
 	{
-		//cout << "active edge size : " << _active_edge.size() << endl;
+		cout << "active edge size : " << _active_edge.size() << endl;
 		for (auto e = ++_active_edge.begin(); e != _active_edge.end(); e++)
 		{
 			//cout << "!flag :["<< e1->poly_id <<"]" << endl;
