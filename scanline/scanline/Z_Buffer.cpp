@@ -1,10 +1,22 @@
 #include <iostream>
 #include <algorithm>
 #include "Z_Buffer.h"
-#include "gtc/matrix_transform.hpp"
 
 using namespace glm;
 using namespace std;
+
+void output(const vec3& v)
+{
+	cout << "(" << v.x << "," << v.y << "," << v.z << ")" << endl;
+}
+
+void output(const mat4& m)
+{
+	cout <<"["<< m[0][0] << "," << m[0][1] << "," << m[0][2] << "," << m[0][3] <<endl
+		<< m[1][0] << "," << m[1][1] << "," << m[1][2] << "," << m[1][3] << endl
+		<< m[2][0] << "," << m[2][1] << "," << m[2][2] << "," << m[2][3] << endl
+		<< m[3][0] << "," << m[3][1] << "," << m[3][2] << "," << m[3][3] << "]" << endl;
+}
 
 void comput_plane_coefficient(const vector<vec3>& point,
 	float& a, float& b, float& c, float& d)
@@ -26,17 +38,18 @@ void comput_plane_coefficient(const vector<vec3>& point,
 
 void Z_Buffer::model_to_clip(vector<vector<vec3>>& faces)
 {
-	mat4 model = glm::mat4(1.0f);
-	//model = translate(model, glm::vec3(0.0f, 100.0f, 0.0f));
-	//model = rotate(model, 45.f, glm::vec3(0.0f, 1.0f, 0.0f));
-	//model = scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
-	mat4 view = glm::lookAt(vec3(0, 0, 100), vec3(0, 0, 0), vec3(0, 1, 0));
-	float x1 = -0.0f, x2 = 600.0f,
-		y1 = -0.0f, y2 = 600.0f;
-	_width = x2 - x1;
-	_height = y2 - y1;
-	mat4 projection = glm::ortho(x1, x2, y1, y2, -50.0f, 300.f);
-	mat4 mvp = projection*view*model;
+	/*mat4 model = glm::mat4(1.0f);
+	model = translate(model, trans_v);
+	if(angle)
+		model = rotate(model, angle, rotate_v);
+	float s_scale = 1;
+	model = scale(model, glm::vec3(s_scale, s_scale, s_scale));
+	mat4 view = glm::lookAt(vec3(0, 0, 1), vec3(0, 0, 0), vec3(0, 1, 0));
+	float x1 = 0.0f, x2 = 600.0f,
+		y1 = 0.0f, y2 = 600.0f;
+	mat4 projection = glm::ortho(x1, x2, y1, y2, -50.0f, 30.f);
+	mat4 mvp = projection*view*model;*/
+	mat4 mvp = _proj*_view*_model;
 	
 	// model world view clip
 	for (auto &f : faces)
@@ -45,32 +58,63 @@ void Z_Buffer::model_to_clip(vector<vector<vec3>>& faces)
 		{
 			vec4 tmp(e, 1);
 			tmp = mvp*tmp;
-			e = tmp;
+			//e = tmp;
 			e.x = (tmp.x + 1.0)*_width / 2;
 			e.y = (tmp.y + 1.0)*_height / 2;
 			e.z = -tmp.z * __min(_width, _height);
-			//cout << e.x << " " << e.y << " " << e.z << endl;
+			//output(e);
 		}
 	}
 }
 
-void Z_Buffer::init(vector<vector<vec3>>& faces)
+void Z_Buffer::init(const vector<vector<vec3>>& faces, const glm::mat4& model,
+	const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up,
+	const float& x1, const float& x2,
+	const float& y1, const float& y2,
+	const float& z1, const float& z2)
 {
+	/*_faces.resize(faces.size());
+	for (int i =0;i<faces.size();++i)
+	{
+		_faces[i].resize(faces[i].size());
+		_faces[i].assign(faces[i].begin(), faces[i].end());
+	}*/
+	_faces = faces;
+	//output(faces[0][0]);
+	look_at(eye, center, up);
+	set_ortho(x1, x2, y1, y2, z1, z2);
+	update_model(model);
+}
+
+void Z_Buffer::clear()
+{
+	_frame_buffer.clear();
+	_poly_table.clear();
+	_edge_table.clear();
+	_poly_table_index.clear();
+	_active_poly.clear();
+	_active_edge.clear();
+}
+
+void Z_Buffer::update_model(const glm::mat4& model)
+{
+	vector<vector<vec3>> faces = _faces;
+	_model = model;
 	model_to_clip(faces);
 	/*_frame_buffer.resize(_width*_height * 3);
 	for (int i = 0; i < _width*_height; i++)
 	{
-		_frame_buffer[i * 3] = i *1.0 / _width / _height;
-		_frame_buffer[i * 3 + 1] = 0;
-		_frame_buffer[i * 3 + 2] = 0;
+	_frame_buffer[i * 3] = i *1.0 / _width / _height;
+	_frame_buffer[i * 3 + 1] = 0;
+	_frame_buffer[i * 3 + 2] = 0;
 	}*/
-	_frame_buffer.resize(_width*_height * 3, 0);
-	//_background_color = vec3(0, 0, 0);
+	clear();
+	_frame_buffer.resize(_width*_height * 3, 0.5);
 	_poly_table.resize(_height);
 	_edge_table.resize(faces.size());
 	_poly_table_index.resize(faces.size(), 0);
 	for (int face_id = 0; face_id < faces.size(); face_id++)  // redo
-	//for (int face_id = 0; face_id < 6; face_id++)
+	//for (int face_id = 4; face_id < 5; face_id++)
 	{
 		PolyTable poly;
 		comput_plane_coefficient(faces[face_id], poly.a, poly.b, poly.c, poly.d);
@@ -79,14 +123,19 @@ void Z_Buffer::init(vector<vector<vec3>>& faces)
 		poly.poly_id = face_id;
 		poly.in_out_flag = false;
 		poly.color = vec3(poly.a, poly.b, poly.c);
+		//poly.color = vec3(abs(poly.a), abs(poly.b), abs(poly.c));
+		//poly.color = vec3(poly.a, poly.a, poly.a);
 		int poly_y_max = INT_MIN, poly_y_min = INT_MAX;
 		for (int edge_id = 0; edge_id < faces[face_id].size(); edge_id++)
 		{
-			vec3 p1 = faces[face_id][edge_id], 
+			vec3 p1 = faces[face_id][edge_id],
 				p2 = faces[face_id][(edge_id + 1) % faces[face_id].size()];
-			//cout << p1.x << " " << p1.y << " " << p1.z << endl;
 			EdgeTable edge;
-			if (round(p1.y) == round(p2.y))
+			/*if (poly.poly_id == 4991)
+			cout << face_id << " " << p1.x << " " << p1.y << " " << p1.z << endl;*/
+			if (round(p1.y) == round(p2.y)
+				|| (p1.x < 0 && p2.x < 0 && p1.y < 0 && p2.y < 0)
+				|| (p1.x > _width && p2.x > _width && p1.y > _height && p2.y > _height))
 				continue;
 			else if (p1.y > p2.y)
 			{
@@ -103,13 +152,26 @@ void Z_Buffer::init(vector<vector<vec3>>& faces)
 					poly_y_min = round(p1.y);
 			}
 			edge.dy = abs(round(p1.y) - round(p2.y));
-			edge.dx = (p1.x - p2.x) / (p2.y - p1.y);
+			edge.dx = (p1.x - p2.x) / (round(p2.y) - round(p1.y));
+			if (edge.y_max > _height)
+			{
+				edge.dy -= (edge.y_max - _height);
+				edge.x += edge.dx*(edge.y_max - _height);
+				edge.y_max = _height - 1;
+			}
 			edge.poly_id = face_id;
 			_edge_table[face_id].push_back(edge);
 			if (poly_y_max < round(edge.y_max))
 				poly_y_max = round(edge.y_max);
+
+			/*if (poly.poly_id == 4991)
+				cout << p1.x << " " << p1.y << " " << p1.z << " "
+				<< edge.x << " " 
+				<< edge.dx << " " 
+				<< edge.dy << " " << edge.poly_id << " "
+				<< endl;*/
 		}
-		if (poly_y_max != INT_MIN)
+		if (poly_y_max != INT_MIN && poly_y_max>=0 && poly_y_max<_height)
 		{
 			//cout << face_id << " " << poly_y_max << endl;
 			poly.dy = poly_y_max - poly_y_min;
@@ -184,11 +246,15 @@ void Z_Buffer::active(const int& y)
 	_active_edge.sort();
 
 	{
-		/*for (auto e : _active_edge)
-		{
-			cout << e.x << " ";
-		}
-		cout << endl;*/
+		//for (auto e : _active_edge)
+		//{
+		//	//cout << e.x << " ";
+		//	if (e.x > 150)
+		//	{
+		//	cout <<y<< ":: " << _active_edge.size() << endl;
+		//	cout << e.poly_id << " " << e.x << " " << e.dy << endl;
+		//	}
+		//}
 		//cout << _active_edge.size() << endl;
 		//cout << _active_poly.size() << endl;
 		//cout <<"tt "<< (*_poly_table_index[_active_poly[0]]).poly_id << endl;
@@ -215,7 +281,7 @@ int Z_Buffer::count_active_poly_flag()
 void Z_Buffer::draw_region(const int& x1, const int& x2, const int& y, const glm::vec3& color)
 {
 	int offset = y*_width * 3;
-	for (int i = __max(x1, 0); i <= x2; i++)
+	for (int i = __max(x1, 0); i <= x2&&i<_width; i++)
 	{
 		_frame_buffer[offset + i * 3] = color.x;
 		_frame_buffer[offset + i * 3 + 1] = color.y;
@@ -236,14 +302,15 @@ void Z_Buffer::draw_line(const int& y)
 	//cout << endl << y << endl;
 	if (_active_edge.size() > 0)
 	{
-		cout << "active edge size : " << _active_edge.size() << endl;
+		//cout << endl << y << " active edge size : " << _active_edge.size() << endl;
 		for (auto e = ++_active_edge.begin(); e != _active_edge.end(); e++)
 		{
 			//cout << "!flag :["<< e1->poly_id <<"]" << endl;
 			_poly_table_index[e1->poly_id]->in_out_flag = !_poly_table_index[e1->poly_id]->in_out_flag;
 			e2 = e;
 			int in_out_flag_size = count_active_poly_flag();
-			//cout << e1->x << " " << e2->x <<" " << in_out_flag_size << endl;
+		/*	cout << e1->poly_id << " " << e1->x << " "
+				<< e2->poly_id << " " << e2->x << " " << in_out_flag_size << endl;*/
 			if ((in_out_flag_size == 1) && (round(e1->x) != round(e2->x)))
 			{
 				color = _poly_table_index[e1->poly_id]->color;
@@ -289,8 +356,8 @@ void Z_Buffer::draw_line(const int& y)
 			e1 = e2;
 		}
 		_poly_table_index[e1->poly_id]->in_out_flag = !_poly_table_index[e1->poly_id]->in_out_flag;
+		//cout << "!flag: [" << e1->poly_id << "]" << endl;
 		//ActiveEdgeTable* end = &_active_edge.back();
-		//cout << "!flag: [" << end->poly_id << "]" << endl;
 		/*e1->x += e1->dx;
 		e1->dy -= 1;
 		if (e1->dy < 0)
@@ -346,9 +413,9 @@ void Z_Buffer::update(const int& y)
 
 void Z_Buffer::draw()
 {
-	/*for (int j = 0; j <= 161; j++)
+	/*for (int j = 392; j <= 439; j++)
 	{
-		for (int i = 162; i <= 500; i++)
+		for (int i = 0; i <= 420; i++)
 		{
 			int index = j*_width * 3;
 			_frame_buffer[index + i * 3] = 1;

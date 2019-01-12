@@ -2,6 +2,7 @@
 #include <vector>
 #include <list>
 #include <glm.hpp>
+#include "gtc/matrix_transform.hpp"
 
 struct EdgeTable 
 {
@@ -38,6 +39,9 @@ private:
 	std::vector<int> _active_poly;
 	std::list<ActiveEdgeTable> _active_edge;
 	//glm::vec3 _background_color;
+	std::vector<std::vector<glm::vec3>> _faces;
+
+	glm::mat4 _model, _view, _proj;
 
 	void active(const int& y);
 	void draw_line(const int& y);
@@ -45,10 +49,26 @@ private:
 	int count_active_poly_flag();
 	void update(const int& y);
 	void model_to_clip(std::vector<std::vector<glm::vec3>>& faces);
+	void clear();
 
 public:
 	void set_size(const int& w, const int& h);
-	void init(std::vector<std::vector<glm::vec3>>& faces);
+	void look_at(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up)
+	{
+		_view = glm::lookAt(eye, center, up);
+	};
+	void set_ortho(const float& x1, const float& x2, const float& y1, const float& y2, const float& z1, const float& z2)
+	{
+		_proj = glm::ortho(x1, x2, y1, y2, z1, z2);
+	};
+	void init(const std::vector<std::vector<glm::vec3>>& faces, const glm::mat4& model,
+		const glm::vec3& eye = glm::vec3(0, 0, 1),
+		const glm::vec3& center = glm::vec3(0, 0, 0),
+		const glm::vec3& up = glm::vec3(0, 1, 0),
+		const float& x1 = 0, const float& x2 = 600,
+		const float& y1 = 0, const float& y2 = 600,
+		const float& z1 = -30, const float& z2 = 50);
+	void update_model(const glm::mat4& model);
 	void draw();
 	void get_buffer(std::vector<float>& buf);
 };

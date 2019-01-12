@@ -2,9 +2,11 @@
 #include <iostream>
 #include "Z_Buffer.h"
 #include "Obj_Loader.h"
+#include "gtc/matrix_transform.hpp"
 
 using namespace std;
 using glm::vec3;
+using glm::mat4;
 
 const GLint image_width = 600, image_height = 600, drawMode = 0;
 Object test;
@@ -13,10 +15,24 @@ vector<float> pixel_data;
 vector<vec3> vec;
 vector<vector<vec3>> face;
 
+vec3 trans_v(0, 0, 0);
+vec3 rotate_v(0, 1, 0);
+float angle = 0, s_scale = 1;
+mat4 model = glm::mat4(1.0f);
+
+void compute_model()
+{
+	model = mat4(1.0f);
+	model = glm::translate(model, trans_v);
+	if (angle)
+		model = glm::rotate(model, angle, rotate_v);
+	model = glm::scale(model, glm::vec3(s_scale, s_scale, s_scale));
+}
+
 void init()
 {
 	// init obj
-	test.read_obj("test7.obj");
+	test.read_obj("test8.obj");
 	test.get_vertices(vec);
 	test.get_faces(face);
 
@@ -56,7 +72,8 @@ void init()
 	}*/
 
 	buf.set_size(image_width, image_height);
-	buf.init(face);
+	compute_model();
+	buf.init(face, model);
 	buf.draw();
 	buf.get_buffer(pixel_data);
 }
@@ -88,7 +105,9 @@ void get_FPS()
 
 void redraw()
 {
-	// TODO£∫ GL_FLOATµƒŒ Ã‚
+	//buf.update(eye, center);
+	/*buf.draw();
+	buf.get_buffer(pixel_data);*/
 
 	//GLubyte pixel_data[image_width*image_height*3];
 	//for (int i = 0; i < image_width*image_height; i++)
@@ -99,7 +118,7 @@ void redraw()
 	//}
 	//glDrawPixels(image_width, image_height,
 	//	GL_BGR_EXT, GL_UNSIGNED_BYTE, pixel_data);
-
+	
 	glClear(GL_COLOR_BUFFER_BIT);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	//glRasterPos3d(0, 0, 0);
@@ -141,6 +160,40 @@ void idle()
 	glutPostRedisplay();
 }
 
+void key(unsigned char k, int x, int y)
+{
+	switch (k)
+	{
+	case 27:
+	case 'q': {exit(0); break; }
+
+	case 'a': {
+		trans_v[0] -= 100.0f;
+		break;
+	}
+	case 'd': {
+		trans_v[0] += 100.0f;
+		break;
+	}
+	case 'w': {
+		trans_v[1] += 100.0f;
+		break;
+	}
+	case 's': {
+		trans_v[1] -= 100.0f;
+		break;
+	}
+	case 'j': {
+		s_scale += 1;
+		break;
+	}
+	}
+	compute_model();
+	buf.update_model(model);
+	buf.draw();
+	buf.get_buffer(pixel_data);
+}
+
 int main(int argc, char *argv[])
 {
 	init();
@@ -148,7 +201,8 @@ int main(int argc, char *argv[])
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutInitWindowSize(image_width, image_height);
 	int windowHandle = glutCreateWindow("Gmy Scanline Z-buffer");
-
+	
+	glutKeyboardFunc(key);
 	glutDisplayFunc(redraw);
 	//glutReshapeFunc(reshape);
 	glutIdleFunc(idle);
