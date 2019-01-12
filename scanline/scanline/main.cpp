@@ -15,9 +15,9 @@ vector<float> pixel_data;
 vector<vec3> vec;
 vector<vector<vec3>> face;
 
-vec3 trans_v(0, 0, 0);
+vec3 trans_v(200, 200, 0);
 vec3 rotate_v(0, 1, 0);
-float angle = 0, s_scale = 1;
+float angle = 0, s_scale = 4;
 mat4 model = glm::mat4(1.0f);
 
 void compute_model()
@@ -32,7 +32,7 @@ void compute_model()
 void init()
 {
 	// init obj
-	test.read_obj("test8.obj");
+	test.read_obj("test9.obj");
 	test.get_vertices(vec);
 	test.get_faces(face);
 
@@ -83,19 +83,19 @@ void get_FPS()
 	static int frame = 0, time, timebase = 0;
 	static char buffer[256];
 
-	char mode[64];
+	/*char mode[64];
 	if (drawMode == 0)
 		strcpy_s(mode, "naive");
 	else if (drawMode == 1)
 		strcpy_s(mode, "vertex array");
 	else
-		strcpy_s(mode, "display list");
+		strcpy_s(mode, "display list");*/
 
 	frame++;
 	time = glutGet(GLUT_ELAPSED_TIME);
 	if (time - timebase > 1000) {
-		sprintf_s(buffer, "FPS:%4.2f %s",
-			frame*1000.0 / (time - timebase), mode);
+		sprintf_s(buffer, "frame:%d, FPS:%4.2f", face.size(), 
+			frame*1000.0 / (time - timebase));
 		timebase = time;
 		frame = 0;
 	}
@@ -183,8 +183,12 @@ void key(unsigned char k, int x, int y)
 		trans_v[1] -= 100.0f;
 		break;
 	}
-	case 'j': {
+	case 'f': {
 		s_scale += 1;
+		break;
+	}
+	case 'r': {
+		angle += 10;
 		break;
 	}
 	}

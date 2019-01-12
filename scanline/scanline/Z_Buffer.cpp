@@ -96,6 +96,56 @@ void Z_Buffer::clear()
 	_active_edge.clear();
 }
 
+bool judge(const EdgeTable &e1, const EdgeTable &e2)
+{
+	glm::vec2 a(e1.x, e1.y_max), b(e1.x+e1.dx*e1.dy, e1.y_max-e1.dy),
+		c(e2.x, e2.y_max), d(e2.x + e2.dx*e2.dy, e2.y_max - e2.dy);
+	
+	return ((c.x - a.x)*(b.y - a.y) - (b.x - a.x)*(c.y - a.y))*((d.x - a.x)*(b.y - a.y) - (b.x - a.x)*(d.y - a.y)) < 0 &&
+		((a.x - c.x)*(d.y - c.y) - (d.x - c.x)*(a.y - c.y))*((b.x - c.x)*(d.y - c.y) - (d.x - c.x)*(b.y - c.y)) < 0;
+}
+
+void cross_point(const EdgeTable &e1, const EdgeTable &e2, glm::vec2& p)
+{
+	glm::vec2 a(e1.x, e1.y_max), b(e1.x + e1.dx*e1.dy, e1.y_max - e1.dy),
+		c(e2.x, e2.y_max), d(e2.x + e2.dx*e2.dy, e2.y_max - e2.dy);
+
+	/*cout << "cross!! "
+		<< glm::dot((a - c), (d - c))*glm::dot((b - c), (d - c)) << " "
+		<< glm::dot((c - a), (b - a))*glm::dot((d - a), (b - a)) << endl << endl
+		<< (a - c).x << " " << (a - c).y << endl
+		<< (d - c).x << " " << (d - c).y << endl
+		<< (b - c).x << " " << (b - c).y << endl
+		<< (d - c).x << " " << (d - c).y << endl
+		<< endl;
+
+	cout << a.x << " " << a.y << endl
+		<< b.x << " " << b.y << endl
+		<< c.x << " " << c.y << endl
+		<< d.x << " " << d.y << endl
+		<< endl;*/
+
+	double a1, b1, c1, a2, b2, c2;
+	a1 = a.y - b.y;
+	b1 = b.x - a.x;
+	c1 = a.x*b.y - b.x*a.y;
+
+	a2 = c.y - d.y;
+	b2 = d.x - c.x;
+	c2 = c.x*d.y - d.x*c.y;
+
+	double D = a1 * b2 - a2 * b1;
+	p.x = (b1 * c2 - b2 * c1) / D;
+	p.y = (a2 * c1 - a1 * c2) / D;
+	
+	/*cout << a1 << " " << b1 << " " << c1 << " r= " << a1 * a.x + b1 * a.y + c1 << " " << a1 * b.x + b1 * b.y + c1 << endl
+		<< a2 << " " << b2 << " " << c2 << " r= " << a2 * c.x + b2 * c.y + c2 << " " << a2 * d.x + b2 * d.y + c2 << endl
+		<< a1 * p.x + b1 * p.y + c1 << endl
+		<< a2 * p.x + b2 * p.y + c2 << endl
+		<< -(a1 * p.x + c1) / b1 << endl
+		<< -(a2 * p.x + c2) / b2 << endl;*/
+}
+
 void Z_Buffer::update_model(const glm::mat4& model)
 {
 	vector<vector<vec3>> faces = _faces;
@@ -160,7 +210,57 @@ void Z_Buffer::update_model(const glm::mat4& model)
 				edge.y_max = _height - 1;
 			}
 			edge.poly_id = face_id;
+
+			{
+				EdgeTable edge_change = edge;
+				for (int j = 0; j < face_id; j++)
+				{
+					for (auto& e2 : _edge_table[j])
+					{
+						if (judge(edge, e2))
+						{
+							if(e2.poly_id == -1)
+								continue;
+							//if (!_poly_table_index[e2.poly_id])
+							//{
+							//	cout << _edge_table[j].size() << endl;
+							//	cout << j << " " << e2.poly_id << " " << _poly_table_index.size() << endl;
+							//	//cout << "id:" << _poly_table_index[e2.poly_id]->poly_id << endl;
+							//}
+							const PolyTable* poly_2 = &(*_poly_table_index[e2.poly_id]);
+							float z1= -(poly.a*edge.x + poly.b*edge.y_max + poly.d) / poly.c,
+								z2 = - (poly_2->a*e2.x + poly_2->b*e2.y_max + poly_2->d) / poly_2->c,
+								z3 = z1 - (poly.a*edge.dx*edge.dy - poly.b*edge.dy) / poly.c,
+								z4 = z2 - (poly_2->a*e2.dx*e2.dy - poly_2->b*e2.dy) / poly_2->c;
+							if ((z1 - z2)*(z3 - z4) < 0)
+							{
+								/*cout << _edge_table.size() << " [" << edge.poly_id << "] " << edge.dx
+									<< " [" << e2.poly_id << "] " << e2.dx << " " << endl;*/
+								vec2 tmp;
+								cross_point(edge, e2, tmp);
+								/*cout << "x1 =" << edge.x << " y1=" << edge.y_max << " " << edge.dx << " " << edge.dy << endl
+									<< "x2 =" << e2.x << " y2=" << e2.y_max << " " << e2.dx << " " << e2.dy << endl
+									<< "x =" << tmp.x << " y=" << tmp.y << " " << edge.y_max << endl << endl;*/
+								
+
+								EdgeTable edge2;
+								edge2.x = round(tmp.x);
+								edge2.dx = edge.x;
+								edge2.dy = edge.dy- (edge.y_max - round(tmp.y));
+								edge2.poly_id = -1;
+								edge2.y_max = round(tmp.y);
+
+								/*_edge_table[face_id].push_back(edge2);
+								edge_change.dy = edge.y_max - round(tmp.y);*/
+								//cout << edge.poly_id << " " << edge2.x << " " << edge2.dy << " " << edge_change.dy << endl;
+							}
+						}
+					}
+				}
+				edge = edge_change;
+			}
 			_edge_table[face_id].push_back(edge);
+
 			if (poly_y_max < round(edge.y_max))
 				poly_y_max = round(edge.y_max);
 
@@ -173,10 +273,26 @@ void Z_Buffer::update_model(const glm::mat4& model)
 		}
 		if (poly_y_max != INT_MIN && poly_y_max>=0 && poly_y_max<_height)
 		{
-			//cout << face_id << " " << poly_y_max << endl;
+			//cout <<"push _poly_table : ["<< face_id << "], " << poly_y_max << endl;
 			poly.dy = poly_y_max - poly_y_min;
 			_poly_table[poly_y_max].push_back(poly);
 			_poly_table_index[face_id] = &(_poly_table[poly_y_max].back());
+		}
+		else
+		{
+			_edge_table[face_id].clear();
+		}
+	}
+
+	{
+		int index = 0;
+		for (auto e : _edge_table)
+		{
+			cout << endl << index++ << endl;
+			for (auto ee : e)
+			{
+				cout << "[" << ee.poly_id << "], x=" << ee.x << " dy=" << ee.dy << "   ";
+			}
 		}
 	}
 
@@ -215,6 +331,7 @@ void Z_Buffer::get_buffer(vector<float>& buf)
 	buf = _frame_buffer;
 };
 
+// active the poly and edge
 void Z_Buffer::active(const int& y)
 {
 	if (y<0 || y>=_poly_table.size())
@@ -235,7 +352,7 @@ void Z_Buffer::active(const int& y)
 				ae.x = e.x;
 				ae.dx = e.dx;
 				ae.dy = e.dy;
-				ae.poly_id = p.poly_id;
+				ae.poly_id = e.poly_id;
 				ae.z = -(p.a*e.x + p.b*e.y_max + p.d) / p.c;
 				ae.dzx = -p.a / p.c;
 				ae.dzy = p.b / p.c;
@@ -305,15 +422,25 @@ void Z_Buffer::draw_line(const int& y)
 		//cout << endl << y << " active edge size : " << _active_edge.size() << endl;
 		for (auto e = ++_active_edge.begin(); e != _active_edge.end(); e++)
 		{
-			//cout << "!flag :["<< e1->poly_id <<"]" << endl;
-			_poly_table_index[e1->poly_id]->in_out_flag = !_poly_table_index[e1->poly_id]->in_out_flag;
+			if (e1->poly_id != -1)
+			{
+				//cout << y << ": !flag :[" << e1->poly_id << "]" << endl;
+				_poly_table_index[e1->poly_id]->in_out_flag = !_poly_table_index[e1->poly_id]->in_out_flag;
+			}
 			e2 = e;
 			int in_out_flag_size = count_active_poly_flag();
 		/*	cout << e1->poly_id << " " << e1->x << " "
 				<< e2->poly_id << " " << e2->x << " " << in_out_flag_size << endl;*/
 			if ((in_out_flag_size == 1) && (round(e1->x) != round(e2->x)))
 			{
-				color = _poly_table_index[e1->poly_id]->color;
+				//color = _poly_table_index[e1->poly_id]->color;
+				for (auto id : _active_poly)
+				{
+					if (_poly_table_index[id]->in_out_flag)
+					{
+						color = _poly_table_index[id]->color;
+					}
+				}
 				draw_region(round(e1->x), round(e2->x), y, color);
 				/*cout << "1 : "
 					<< e1->poly_id << " " << e1->x << " " << e1->dx << ", "
@@ -355,7 +482,10 @@ void Z_Buffer::draw_line(const int& y)
 				_active_edge.erase(e1);*/
 			e1 = e2;
 		}
-		_poly_table_index[e1->poly_id]->in_out_flag = !_poly_table_index[e1->poly_id]->in_out_flag;
+		if (e1->poly_id != -1)
+		{
+			_poly_table_index[e1->poly_id]->in_out_flag = !_poly_table_index[e1->poly_id]->in_out_flag;
+		}
 		//cout << "!flag: [" << e1->poly_id << "]" << endl;
 		//ActiveEdgeTable* end = &_active_edge.back();
 		/*e1->x += e1->dx;
@@ -365,6 +495,7 @@ void Z_Buffer::draw_line(const int& y)
 	}
 }
 
+// after the draw, update the poly and edge
 void Z_Buffer::update(const int& y)
 {
 	//cout << _active_poly.size() << endl;
@@ -376,20 +507,29 @@ void Z_Buffer::update(const int& y)
 		else
 			p++;
 	}
+	//cout << _active_edge.size() << endl;
+	int index = 0;
 	for (auto e = _active_edge.begin(); e != _active_edge.end();)
 	{
+		cout << endl << index++ << endl;
 		e->x += e->dx;
-		//cout <<"dy: "<< e->dy << endl;
+		cout << "x=" << e->x << " dy=" << e->dy << " [" << e->poly_id << "]" << endl;
 		e->dy--;
 		if (e->dy < 0)
 		{
 			//cout << "dy<0 " << e->poly_id << endl;
-			if (count(_active_poly.begin(), _active_poly.end(), e->poly_id) != 0)
+			if (e->poly_id == -1)
 			{
+				cout << "!!!" << endl;
+			}
+			if (e->poly_id != -1 && count(_active_poly.begin(), _active_poly.end(), e->poly_id) != 0)
+			{
+				//cout << "---" << endl;
 				for (auto edge_add : _edge_table[e->poly_id])
 				{
 					// cout << e.x << " " << e.dx << " " << e.dy << " " << e.y_max << endl;
 					//cout << edge_add.y_max << endl;
+					//cout << e->poly_id << endl;
 					if (round(edge_add.y_max) == y)
 					{
 						ActiveEdgeTable ae;
@@ -401,6 +541,7 @@ void Z_Buffer::update(const int& y)
 						ae.dzx = e->dzx;
 						ae.dzy = e->dzy;
 						_active_edge.push_back(ae);
+						cout << "push " << e->poly_id << endl;
 					}
 				}
 			}
@@ -413,7 +554,7 @@ void Z_Buffer::update(const int& y)
 
 void Z_Buffer::draw()
 {
-	/*for (int j = 392; j <= 439; j++)
+	for (int j = 0; j <= 300; j++)
 	{
 		for (int i = 0; i <= 420; i++)
 		{
@@ -422,10 +563,11 @@ void Z_Buffer::draw()
 			_frame_buffer[index + i * 3 + 1] = 0;
 			_frame_buffer[index + i * 3 + 2] = 0;
 		}
-	}*/
+	}
 
 	for (int y = _height - 1; y >= 0; y--)
 	{
+		cout << y << endl;
 		active(y);
 		draw_line(y);
 		update(y);

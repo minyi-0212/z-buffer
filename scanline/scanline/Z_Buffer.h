@@ -38,7 +38,9 @@ private:
 	std::vector<std::list<EdgeTable>> _edge_table;
 	std::vector<int> _active_poly;
 	std::list<ActiveEdgeTable> _active_edge;
-	//glm::vec3 _background_color;
+
+	std::vector<std::list<EdgeTable>> _throughout_edge;
+
 	std::vector<std::vector<glm::vec3>> _faces;
 
 	glm::mat4 _model, _view, _proj;
